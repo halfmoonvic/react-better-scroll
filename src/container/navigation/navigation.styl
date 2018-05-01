@@ -1,0 +1,47 @@
+.bs-list
+  width: 80%
+  height: 100%
+  margin: 0 auto
+  text-align: center
+  .bs-item
+    margin-top: 10px
+
+.demo-container
+  position: fixed
+  top: 0
+  left: 0
+  z-index: -1
+  width: 100%
+  height: 100%
+
+.show
+  z-index: 1
+
+.hide
+  z-index: -1
+
+// 播放器动画
+.player-transition-enter
+    opacity: 0
+    // transform: translateX(100%)
+
+.player-transition-enter, .player-transition-enter-active
+    opacity: 1
+    // transform: translateX(0)
+    transition: all 300ms ease-in
+
+.player-transition-exit
+    opacity: 1
+    // transform: translateX(0)
+
+.player-transition-exit, .player-transition-exit-active
+    opacity: 0
+    // transform: translateX(-100%)
+    transition: all 300ms ease-out
+
+
+.player-transition-appear
+    opacity: 0
+.player-transition-appear, .player-transition-appear-active
+    opacity: 1
+    transition: all 300ms ease-in
