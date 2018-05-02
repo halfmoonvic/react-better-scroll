@@ -1,5 +1,6 @@
 /**** React应用依赖组件 ****/
 // core
+import './loading.styl'
 import React, { Component } from 'react'
 /******* 第三方 组件库 *****/
 /**** 本地公用变量 公用函数 **/

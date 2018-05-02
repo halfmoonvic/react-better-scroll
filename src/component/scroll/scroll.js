@@ -8,6 +8,8 @@ import BScroll from 'better-scroll';
 /**** 本地公用变量 公用函数 **/
 import { getRect } from '@/common/js/dom';
 /******* 本地 公用组件 *****/
+import Bubble from 'component/bubble/bubble';
+import Loading from 'component/loading/loading';
 /**** 当前组件的 子组件等 ***/
 
 const COMPONENT_NAME = 'scroll';
@@ -56,12 +58,32 @@ class Scroll extends Component {
       this.initScroll();
     }, 20);
   }
+  constructor(props) {
+    super(props);
+    this.pullDownInitTop = -50
+    this.state = {
+      beforePullDown: true,
+      isRebounding: false,
+      isPullingDown: false,
+      isPullUpLoad: false,
+      pullUpDirty: true,
+      pullDownStyle: {},
+      bubbleY: 0
+    };
+  }
+  get refreshTxt() {
+    return (
+      (this.props.pullDownRefresh && this.props.pullDownRefresh.txt) ||
+      '刷新成功'
+    );
+  }
   componentWillReceiveProps(nextProps) {
+    if (this.props.data.length === 15) {
+      console.log(nextProps.data, nextProps.data)
     // 刷新
-    if (nextProps.data !== this.props.data) {
       setTimeout(() => {
-        this.refresh();
-      }, 20);
+        this.forceUpdate(true);
+      }, this.props.refreshDelay);
     }
   }
   initScroll() {
@@ -90,6 +112,10 @@ class Scroll extends Component {
         this.props.scroll(pos);
       });
     }
+
+    if (this.props.pullDownRefresh) {
+      this._initPullDownRefresh();
+    }
   }
   enable() {
     this.scroll && this.scroll.enable();
@@ -100,10 +126,84 @@ class Scroll extends Component {
   refresh() {
     this.scroll && this.scroll.refresh();
   }
-  clickItem(e, item) {
-    if (this.props.diyClick) {
-      this.props.diyClick(item);
+  clickItem(event, item) {
+    if (this.props.clickItem) {
+      this.props.clickItem(item);
     }
+  }
+  forceUpdate(dirty) {
+    if (this.props.pullDownRefresh && this.state.isPullingDown) {
+      this.setState({
+        isPullingDown: false
+      })
+      this._reboundPullDown().then(() => {
+        this._afterPullDown()
+      })
+    } else if (this.state.pullUpLoad && this.state.isPullUpLoad) {
+      this.setState({
+        isPullUpLoad: false
+      })
+      this.scroll.finishPullUp()
+      this.pullUpDirty = dirty
+      this.refresh()
+    } else {
+      this.refresh()
+    }
+  }
+  _initPullDownRefresh() {
+    this.scroll.on('pullingDown', () => {
+      this.setState({
+        beforePullDown: false,    // bs 事件触发顺序是 先 scroll，在鼠标放开后在触发 pullingDown
+        isPullingDown: true
+      });
+      this.props.pullingDown();
+    });
+
+    this.scroll.on('scroll', pos => {
+      if (!this.props.pullDownRefresh) {
+        return;
+      }
+      if (this.state.beforePullDown) {
+        this.setState({
+          bubbleY: Math.max(0, pos.y + this.pullDownInitTop),
+          pullDownStyle: {
+            top: `${Math.min(pos.y + this.pullDownInitTop, 10)}px`
+          }
+        });
+      } else {
+        this.setState({
+          bubbleY: 0
+        });
+      }
+
+      if (this.state.isRebounding) {
+        this.setState({
+          pullDownStyle: {
+            top: `${10 - (this.props.pullDownRefresh.stop - pos.y)}px`
+          }
+        });
+      }
+    });
+  }
+  _afterPullDown() {
+    setTimeout(() => {
+      this.pullDownStyle = `top:${this.pullDownInitTop}px`
+      this.beforePullDown = true
+      this.isRebounding = false
+      this.refresh()
+    }, this.scroll.options.bounceTime)
+  }
+  _reboundPullDown() {
+    const {stopTime = 600} = this.props.pullDownRefresh
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        this.setState({
+          isRebounding: true
+        })
+        this.scroll.finishPullDown()
+        resolve()
+      }, stopTime)
+    })
   }
   render() {
     return (
@@ -128,6 +228,33 @@ class Scroll extends Component {
             )}
           </div>
         </div>
+        {this.props.pulldown ? (
+          this.props.pulldown
+        ) : (
+          <div
+            className="pulldown-wrapper"
+            ref="pulldown"
+            style={this.state.pullDownStyle}>
+            {this.state.beforePullDown ? (
+              <div className="before-trigger">
+                bubble component
+                {/*<Bubble y={this.state.bubbleY} />*/}
+              </div>
+            ) : (
+              <div className="after-trigger">
+                {this.state.isPullingDown ? (
+                  <div className="loading">
+                    <Loading />
+                  </div>
+                ) : (
+                  <div>
+                    <span>{this.refreshTxt}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }

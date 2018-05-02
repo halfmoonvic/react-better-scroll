@@ -48,7 +48,7 @@ class Bubble extends Component {
     this._draw()
   }
   _draw() {
-    const bubble = this.$refs.bubble
+    const bubble = this.refs.bubble
     let ctx = bubble.getContext('2d')
     ctx.clearRect(0, 0, bubble.width, bubble.height)
 
@@ -132,7 +132,7 @@ class Bubble extends Component {
   }
   render() {
     const {width, height} = this.state
-    return <canvas ref="bubble" width={width} height={height} style={this.style} />;
+    return <canvas ref="bubble" width={width} height={height} />;
   }
 }
 

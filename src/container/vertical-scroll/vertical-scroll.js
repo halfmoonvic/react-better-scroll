@@ -14,13 +14,27 @@ class BScroll extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      scrollbar: true, // 是否显示滚动条
-      scrollbarFade: false // false 让滚动条一直显示
+      scrollbar: false, // 是否显示滚动条
+      scrollbarFade: false, // false 让滚动条一直显示
+      pullDownRefresh: true,
+      pullDownRefreshThreshold: 90,
+      pullDownRefreshStop: 40,
+      startY: 0,
+      items: []
     };
     this.clickItem = this.clickItem.bind(this);
+    this.onPullingDown = this.onPullingDown.bind(this);
   }
   get scrollbarObj() {
     return this.state.scrollbar ? { fade: this.state.scrollbarFade } : false;
+  }
+  get pullDownRefreshObj() {
+    return this.state.pullDownRefresh
+      ? {
+          threshold: parseInt(this.state.pullDownRefreshThreshold),
+          stop: parseInt(this.state.pullDownRefreshStop)
+        }
+      : false;
   }
   componentWillMount() {
     let i = 1;
@@ -35,13 +49,37 @@ class BScroll extends Component {
     console.log(item);
     // this.props.history.goBack()
   }
+  onPullingDown() {
+    // 模拟更新数据
+    console.log('pulling down and load data');
+    setTimeout(() => {
+      if (this._isDestroyed) {
+        return;
+      }
+      // if (Math.random() > 0.5) {
+        let temp = this.state.items;
+        temp.unshift('这是新数据' + +new Date());
+        // 如果有新数据
+        this.setState({
+          items: temp
+        });
+      // } else {
+        // 如果没有新数据
+        // this.refs.scroll.forceUpdate();
+      // }
+    }, 2000);
+  }
   render() {
+    console.log('render')
     return (
       <Page title="vertical-scroll 普通 scroll组件">
         <Scroll
           data={this.state.items}
           scrollbar={this.scrollbarObj}
-          diyClick={this.clickItem}
+          clickItem={this.clickItem}
+          pullDownRefresh={this.pullDownRefreshObj}
+          pullingDown={this.onPullingDown}
+          startY={parseInt(this.state.startY)}
         />
       </Page>
     );
