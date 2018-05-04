@@ -14,8 +14,8 @@ class BScroll extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      scrollbar: false, // 是否显示滚动条
-      scrollbarFade: false, // false 让滚动条一直显示
+      scrollbar: true, // 是否显示滚动条
+      scrollbarFade: true, // false 让滚动条一直显示
       pullDownRefresh: true,
       pullDownRefreshThreshold: 90,
       pullDownRefreshStop: 40,
@@ -70,7 +70,7 @@ class BScroll extends Component {
     }, 2000);
   }
   render() {
-    console.log('render')
+    console.log('vertical-scroll render...')
     return (
       <Page title="vertical-scroll 普通 scroll组件">
         <Scroll

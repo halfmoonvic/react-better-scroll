@@ -1,7 +1,7 @@
 /**** React应用依赖组件 ****/
 // core
 import './scroll.styl';
-import React, { Component } from 'react';
+import React, { PureComponent } from 'react';
 import propTypes from 'prop-types';
 /******* 第三方 组件库 *****/
 import BScroll from 'better-scroll';
@@ -16,22 +16,22 @@ const COMPONENT_NAME = 'scroll';
 const DIRECTION_H = 'horizontal';
 const DIRECTION_V = 'vertical';
 
-class Scroll extends Component {
+class Scroll extends PureComponent {
   static defaultProps = {
-    data: [],
-    probeType: 1,
-    click: true,
-    listenScroll: false,
-    listenBeforeScroll: false,
-    direction: DIRECTION_V,
-    scrollbar: false,
-    pullDownRefresh: false,
-    pullUpLoad: false,
-    startY: 0,
-    refreshDelay: 20,
-    freeScroll: false,
-    mouseWheel: false,
-    bounce: true
+    data: [],                    // 滚动数据
+    probeType: 1,                // 滚动时派发事件
+    click: true,                 // 是否可点击
+    listenScroll: false,         // 外部监听滚动
+    listenBeforeScroll: false,   // 滚动之前是否监听
+    direction: DIRECTION_V,      // 滚动方向
+    scrollbar: false,            // 是否显示 滚动条
+    pullDownRefresh: false,      // 是否开启下拉刷新
+    pullUpLoad: false,           // 是否开启上拉加载数据
+    startY: 0,                   // 滚动的内容初始化时的位置
+    refreshDelay: 20,            // 延迟刷新的时间
+    freeScroll: false,           // 是否自由滚动
+    mouseWheel: false,           // PC端，鼠标滚动
+    bounce: true                 // 滚动回弹
   };
   static propTypes = {
     data: propTypes.array,
@@ -53,23 +53,18 @@ class Scroll extends Component {
     mouseWheel: propTypes.bool,
     bounce: propTypes.bool
   };
-  componentDidMount() {
-    setTimeout(() => {
-      this.initScroll();
-    }, 20);
-  }
   constructor(props) {
     super(props);
-    this.pullDownInitTop = -50
     this.state = {
-      beforePullDown: true,
-      isRebounding: false,
-      isPullingDown: false,
+      beforePullDown: true,       // 是否处于下拉刷新开始前状态
+      isPullingDown: false,       // 是否正在下拉刷新
+      isRebounding: false,        // 下拉刷新加载数据后，是否是正在回弹的状态
+      pullDownStyle: {},          // pulldown-wrapper 的位置
       isPullUpLoad: false,
       pullUpDirty: true,
-      pullDownStyle: {},
-      bubbleY: 0
+      bubbleY: 0                  // 根据 BS 位置计算出来的一个值
     };
+    this.pullDownInitTop = -50;   // pulldown-wrapper 初始所在的位置，其高度大小是由其内容决定的。
   }
   get refreshTxt() {
     return (
@@ -77,10 +72,13 @@ class Scroll extends Component {
       '刷新成功'
     );
   }
+  componentDidMount() {
+    setTimeout(() => {
+      this.initScroll();
+    }, 20);
+  }
   componentWillReceiveProps(nextProps) {
-    if (this.props.data.length === 15) {
-      console.log(nextProps.data, nextProps.data)
-    // 刷新
+    if (this.props.data.length) {
       setTimeout(() => {
         this.forceUpdate(true);
       }, this.props.refreshDelay);
@@ -113,9 +111,18 @@ class Scroll extends Component {
       });
     }
 
+    if (this.listenBeforeScroll) {
+      this.scroll.on('beforeScrollStart', () => {
+        this.props.beforeScrollStart();
+      });
+    }
+
     if (this.props.pullDownRefresh) {
       this._initPullDownRefresh();
     }
+  }
+  disable() {
+    this.scroll && this.scroll.disable();
   }
   enable() {
     this.scroll && this.scroll.enable();
@@ -126,34 +133,46 @@ class Scroll extends Component {
   refresh() {
     this.scroll && this.scroll.refresh();
   }
+  scrollTo() {
+    this.scroll && this.scroll.scrollTo.apply(this.scroll, arguments);
+  }
+  scrollToElement() {
+    this.scroll && this.scroll.scrollToElement.apply(this.scroll, arguments);
+  }
   clickItem(event, item) {
     if (this.props.clickItem) {
       this.props.clickItem(item);
     }
   }
+  destroy() {
+    this.scroll.destroy();
+  }
   forceUpdate(dirty) {
     if (this.props.pullDownRefresh && this.state.isPullingDown) {
+      // 数据获取成功后，将Loading组件置false
       this.setState({
         isPullingDown: false
-      })
+      });
       this._reboundPullDown().then(() => {
-        this._afterPullDown()
-      })
+        this._afterPullDown();
+      });
     } else if (this.state.pullUpLoad && this.state.isPullUpLoad) {
       this.setState({
         isPullUpLoad: false
-      })
-      this.scroll.finishPullUp()
-      this.pullUpDirty = dirty
-      this.refresh()
+      });
+      this.scroll.finishPullUp();
+      this.pullUpDirty = dirty;
+      this.refresh();
     } else {
-      this.refresh()
+      this.refresh();
     }
   }
+  // 下拉刷新开始
   _initPullDownRefresh() {
+    // scroll 事件是只要有滚动便会触发。在 scroll 滚动的过程当中会监听到下拉刷新。继而触发 pullingDown 事件。
     this.scroll.on('pullingDown', () => {
       this.setState({
-        beforePullDown: false,    // bs 事件触发顺序是 先 scroll，在鼠标放开后在触发 pullingDown
+        beforePullDown: false,
         isPullingDown: true
       });
       this.props.pullingDown();
@@ -163,10 +182,14 @@ class Scroll extends Component {
       if (!this.props.pullDownRefresh) {
         return;
       }
+      // 鼠标开始下拉刷新时候的动作，pulldown-wrapper 跟随下拉
       if (this.state.beforePullDown) {
         this.setState({
           bubbleY: Math.max(0, pos.y + this.pullDownInitTop),
           pullDownStyle: {
+            // pulldown-wrapper 可以距离顶部的距离
+            // 注意，pulldown-wrapper 的大小是由 其内部内容决定的。
+            // 官方组件的 bubble 即为其内容，它的高度大小还可根据 传入的 bubbleY 来改变其本身高度
             top: `${Math.min(pos.y + this.pullDownInitTop, 10)}px`
           }
         });
@@ -176,8 +199,10 @@ class Scroll extends Component {
         });
       }
 
+      // 数据获取成功后，执行 forceUpdate，其中有关于将 isRebounding 的 条件
       if (this.state.isRebounding) {
         this.setState({
+          // 控制 pulldown-wrapper 回弹的动画，使 pulldown-wrapper 逐步上移
           pullDownStyle: {
             top: `${10 - (this.props.pullDownRefresh.stop - pos.y)}px`
           }
@@ -185,27 +210,36 @@ class Scroll extends Component {
       }
     });
   }
-  _afterPullDown() {
-    setTimeout(() => {
-      this.pullDownStyle = `top:${this.pullDownInitTop}px`
-      this.beforePullDown = true
-      this.isRebounding = false
-      this.refresh()
-    }, this.scroll.options.bounceTime)
-  }
+  // 成功获取数据后，告知better-scroll数据已加载,开始回弹
+  // 回弹动作在 _initPullDownRefresh函数里面,依靠监听 isRebounding 来触发
   _reboundPullDown() {
-    const {stopTime = 600} = this.props.pullDownRefresh
-    return new Promise((resolve) => {
+    // 数据获取成功后，显示刷新成功提示，过 stopTime 时间，执行 _afterPullDown 函数
+    const { stopTime = 600 } = this.props.pullDownRefresh;
+    return new Promise(resolve => {
       setTimeout(() => {
         this.setState({
           isRebounding: true
-        })
-        this.scroll.finishPullDown()
-        resolve()
-      }, stopTime)
-    })
+        });
+        this.scroll.finishPullDown();
+        resolve();
+      }, stopTime);
+    });
+  }
+  // 在 回弹动作完成后 执行此函数，即将 pulldonw-wrapper 置于初始位置
+  _afterPullDown() {
+    setTimeout(() => {
+      this.setState({
+        beforePullDown: true,
+        isRebounding: false,
+        pullDownStyle: {
+          top: `${this.pullDownInitTop}px`
+        }
+      });
+      this.refresh();
+    }, this.scroll.options.bounceTime);
   }
   render() {
+    console.log('scroll.js render...')
     return (
       <div ref="wrapperScroll" className="o-scroll">
         <div className="scroll-content">
@@ -237,8 +271,8 @@ class Scroll extends Component {
             style={this.state.pullDownStyle}>
             {this.state.beforePullDown ? (
               <div className="before-trigger">
-                bubble component
                 {/*<Bubble y={this.state.bubbleY} />*/}
+                Bubble 组件
               </div>
             ) : (
               <div className="after-trigger">
