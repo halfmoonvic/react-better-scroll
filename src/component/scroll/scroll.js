@@ -12,26 +12,27 @@ import Bubble from 'component/bubble/bubble';
 import Loading from 'component/loading/loading';
 /**** 当前组件的 子组件等 ***/
 
-const COMPONENT_NAME = 'scroll';
 const DIRECTION_H = 'horizontal';
 const DIRECTION_V = 'vertical';
 
 class Scroll extends PureComponent {
   static defaultProps = {
-    data: [],                    // 滚动数据
-    probeType: 1,                // 滚动时派发事件
-    click: true,                 // 是否可点击
-    listenScroll: false,         // 外部监听滚动
-    listenBeforeScroll: false,   // 滚动之前是否监听
-    direction: DIRECTION_V,      // 滚动方向
-    scrollbar: false,            // 是否显示 滚动条
-    pullDownRefresh: false,      // 是否开启下拉刷新
-    pullUpLoad: false,           // 是否开启上拉加载数据
-    startY: 0,                   // 滚动的内容初始化时的位置
-    refreshDelay: 20,            // 延迟刷新的时间
-    freeScroll: false,           // 是否自由滚动
-    mouseWheel: false,           // PC端，鼠标滚动
-    bounce: true                 // 滚动回弹
+    data: [], // 滚动数据
+    probeType: 1, // 滚动时派发事件
+    click: true, // 是否可点击item，如果启用，外部传入 clickItem
+    listenScroll: false, // 外部监听滚动，如果启用，外部传入 scroll
+    listenBeforeScroll: false, // 滚动之前是否监听，外部传入 beforeScrollStart
+    direction: DIRECTION_V, // 滚动方向
+    scrollbar: false, // 是否显示 滚动条
+    pullDownRefresh: false, // 是否开启下拉刷新
+    pulldownRender: null, // 下拉刷新自定义html，应由外部传入
+    pullUpLoad: false, // 是否开启上拉加载数据
+    pullUpLoadRender: null, // 下拉加载数据自定义html，应由外部传入
+    startY: 0, // 滚动的内容初始化时的位置
+    refreshDelay: 20, // 延迟刷新的时间
+    freeScroll: false, // 是否自由滚动
+    mouseWheel: false, // PC端，鼠标滚动
+    bounce: true // 滚动回弹
   };
   static propTypes = {
     data: propTypes.array,
@@ -40,13 +41,9 @@ class Scroll extends PureComponent {
     listenScroll: propTypes.bool,
     listenBeforeScroll: propTypes.bool,
     direction: propTypes.string,
-    // scrollbar: propTypes.null,
-    // pullDownRefresh: propTypes.null,
-    // pullUpLoad: propTypes.null,
-
-    // scrollbar: () => null,
-    // pullDownRefresh:  () => null,
-    // pullUpLoad:  () => null,
+    scrollbar: () => null,
+    pullDownRefresh: () => null,
+    pullUpLoad: () => null,
     startY: propTypes.number,
     refreshDelay: propTypes.number,
     freeScroll: propTypes.bool,
@@ -56,21 +53,36 @@ class Scroll extends PureComponent {
   constructor(props) {
     super(props);
     this.state = {
-      beforePullDown: true,       // 是否处于下拉刷新开始前状态
-      isPullingDown: false,       // 是否正在下拉刷新
-      isRebounding: false,        // 下拉刷新加载数据后，是否是正在回弹的状态
-      pullDownStyle: {},          // pulldown-wrapper 的位置
+      beforePullDown: true, // 是否处于下拉刷新开始前状态
+      isPullingDown: false, // 是否正在下拉刷新
+      isRebounding: false, // 下拉刷新加载数据后，是否是正在回弹的状态
+      pullDownStyle: {}, // pulldown-wrapper 的位置
       isPullUpLoad: false,
       pullUpDirty: true,
-      bubbleY: 0                  // 根据 BS 位置计算出来的一个值
+      bubbleY: 0 // 根据 BS 位置计算出来的一个值
     };
-    this.pullDownInitTop = -50;   // pulldown-wrapper 初始所在的位置，其高度大小是由其内容决定的。
+    this.pullDownInitTop = -50; // pulldown-wrapper 初始所在的位置，其高度大小是由其内容决定的。
   }
   get refreshTxt() {
     return (
       (this.props.pullDownRefresh && this.props.pullDownRefresh.txt) ||
       '刷新成功'
     );
+  }
+  get pullUpTxt() {
+    const moreTxt =
+      (this.props.pullUpLoad &&
+        this.props.pullUpLoad.txt &&
+        this.props.pullUpLoad.txt.more) ||
+      '加载更多';
+
+    const noMoreTxt =
+      (this.props.pullUpLoad &&
+        this.props.pullUpLoad.txt &&
+        this.props.pullUpLoad.txt.noMore) ||
+      '没有更多数据了';
+
+    return this.state.pullUpDirty ? moreTxt : noMoreTxt;
   }
   componentDidMount() {
     setTimeout(() => {
@@ -87,6 +99,11 @@ class Scroll extends PureComponent {
   initScroll() {
     if (!this.refs.wrapperScroll) {
       return;
+    }
+
+    // 当数据少时，让 listWrapper 高度大小与 wrapperScroll 大小相一致
+    if (this.refs.listWrapper && (this.props.pullDownRefresh || this.props.pullUpLoad)) {
+      this.refs.listWrapper.style.minHeight = `${getRect(this.refs.wrapperScroll).height + 1}px`
     }
 
     let options = {
@@ -119,6 +136,10 @@ class Scroll extends PureComponent {
 
     if (this.props.pullDownRefresh) {
       this._initPullDownRefresh();
+    }
+
+    if (this.props.pullUpLoad) {
+      this._initPullUpLoad();
     }
   }
   disable() {
@@ -156,12 +177,14 @@ class Scroll extends PureComponent {
       this._reboundPullDown().then(() => {
         this._afterPullDown();
       });
-    } else if (this.state.pullUpLoad && this.state.isPullUpLoad) {
+    } else if (this.props.pullUpLoad && this.state.isPullUpLoad) {
       this.setState({
         isPullUpLoad: false
       });
       this.scroll.finishPullUp();
-      this.pullUpDirty = dirty;
+      this.setState({
+        pullUpDirty: dirty
+      });
       this.refresh();
     } else {
       this.refresh();
@@ -238,8 +261,17 @@ class Scroll extends PureComponent {
       this.refresh();
     }, this.scroll.options.bounceTime);
   }
+  // 上来加载数据开始
+  _initPullUpLoad() {
+    this.scroll.on('pullingUp', () => {
+      this.setState({
+        isPullUpLoad: true
+      });
+      this.props.pullingUp();
+    });
+  }
   render() {
-    console.log('scroll.js render...')
+    console.log('scroll.js render...');
     return (
       <div ref="wrapperScroll" className="o-scroll">
         <div className="scroll-content">
@@ -261,34 +293,53 @@ class Scroll extends PureComponent {
               </ul>
             )}
           </div>
-        </div>
-        {this.props.pulldown ? (
-          this.props.pulldown
-        ) : (
-          <div
-            className="pulldown-wrapper"
-            ref="pulldown"
-            style={this.state.pullDownStyle}>
-            {this.state.beforePullDown ? (
-              <div className="before-trigger">
-                {/*<Bubble y={this.state.bubbleY} />*/}
-                Bubble 组件
-              </div>
+          {this.props.pullUpLoad ? (
+            this.props.pullUpLoadRender ? (
+              this.props.pullUpLoadRender
             ) : (
-              <div className="after-trigger">
-                {this.state.isPullingDown ? (
-                  <div className="loading">
-                    <Loading />
+              <div className="pullup-wrapper">
+                {!this.state.isPullUpLoad ? (
+                  <div className="before-trigger">
+                    <span>{this.pullUpTxt}</span>
                   </div>
                 ) : (
-                  <div>
-                    <span>{this.refreshTxt}</span>
+                  <div className="after-trigger">
+                    <Loading />
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        )}
+            )
+          ) : null}
+        </div>
+        {this.props.pullDownRefresh ? (
+          this.props.pulldownRender ? (
+            this.props.pulldownRender
+          ) : (
+            <div
+              className="pulldown-wrapper"
+              ref="pulldown"
+              style={this.state.pullDownStyle}>
+              {this.state.beforePullDown ? (
+                <div className="before-trigger">
+                  {/*<Bubble y={this.state.bubbleY} />*/}
+                  Bubble 组件
+                </div>
+              ) : (
+                <div className="after-trigger">
+                  {this.state.isPullingDown ? (
+                    <div className="loading">
+                      <Loading />
+                    </div>
+                  ) : (
+                    <div>
+                      <span>{this.refreshTxt}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        ) : null}
       </div>
     );
   }
