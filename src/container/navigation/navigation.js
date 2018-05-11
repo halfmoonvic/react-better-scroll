@@ -6,7 +6,7 @@ import { BrowserRouter as Router, Route, Link, Switch } from 'react-router-dom';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 
 import VerTicalScroll from 'container/vertical-scroll/vertical-scroll';
-import IndexList from 'container/index-list/index-list';
+import IndexListWrapper from 'container/index-list/index-list';
 /******* 第三方 组件库 *****/
 /**** 本地公用变量 公用函数 **/
 /******* 本地 公用组件 *****/
@@ -70,7 +70,7 @@ class Navigation extends Component {
                     timeout={300}>
                     <Switch location={location}>
                       <Route path="/vertical-scroll" component={VerTicalScroll} />
-                      <Route path="/index-list" component={IndexList} />
+                      <Route path="/index-list" component={IndexListWrapper} />
                     </Switch>
                   </CSSTransition>
                 </TransitionGroup>
